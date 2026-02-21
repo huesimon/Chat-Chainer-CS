@@ -406,12 +406,12 @@
           const safe      = sanitiseLine(lines[i]);
           const command   = useSay ? 'say ' + safe : safe;
 
-          rows.push(`alias "${name}" "${command}; alias loop_cmd ${nextName}"`);
+          rows.push(`alias "${name}" "${command}; alias loop_cmd ${nextName}";`);
         }
 
         rows.push('');
-        rows.push(`alias "loop_cmd" "${aliasName(1)}"`);
-        rows.push(`bind "${bindKey}" "loop_cmd"`);
+        rows.push(`alias "loop_cmd" "${aliasName(1)}";`);
+        rows.push(`bind "${bindKey}" "loop_cmd";`);
 
         return rows.join('\n');
       }
