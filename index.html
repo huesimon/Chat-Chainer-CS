@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CS2 Chat Chainer – Cyclic Alias Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              cs2: {
+                bg:      '#0f1117',
+                surface: '#1a1d27',
+                border:  '#2e3347',
+                accent:  '#f0a000',
+                muted:   '#8b92a8',
+              }
+            },
+            fontFamily: {
+              mono: ['"Fira Code"', '"Cascadia Code"', 'Consolas', 'monospace'],
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ── CSS variables (design tokens) ─────────────────────────────────── */
+    :root {
+      --bg:      #0f1117;
+      --surface: #1a1d27;
+      --border:  #2e3347;
+      --accent:  #f0a000;
+      --muted:   #8b92a8;
+      --text:    #e2e8f0;
+      --green:   #4ade80;
+      --mono:    "Fira Code", "Cascadia Code", Consolas, monospace;
+    }
+
+    /* ── Reset / base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Scrollbar ──────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    /* ── Layout helpers ─────────────────────────────────────────────────── */
+    .max-w-3xl { max-width: 48rem; }
+    .mx-auto    { margin-left: auto; margin-right: auto; }
+    .px-4       { padding-left: 1rem; padding-right: 1rem; }
+    .py-4       { padding-top: 1rem; padding-bottom: 1rem; }
+    .py-5       { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+    .py-8       { padding-top: 2rem; padding-bottom: 2rem; }
+    .mt-2       { margin-top: .5rem; }
+    .mt-3       { margin-top: .75rem; }
+    .mt-4       { margin-top: 1rem; }
+    .mt-8       { margin-top: 2rem; }
+    .mb-2       { margin-bottom: .5rem; }
+    .space-y-2 > * + * { margin-top: .5rem; }
+    .space-y-3 > * + * { margin-top: .75rem; }
+    .space-y-8 > * + * { margin-top: 2rem; }
+    .gap-2  { gap: .5rem; }
+    .gap-3  { gap: .75rem; }
+    .gap-4  { gap: 1rem; }
+    .flex   { display: flex; }
+    .flex-wrap { flex-wrap: wrap; }
+    .flex-shrink-0 { flex-shrink: 0; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .inline-flex { display: inline-flex; }
+    .block  { display: block; }
+    .hidden { display: none !important; }
+    .relative { position: relative; }
+
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    .text-xs   { font-size: .75rem; }
+    .text-sm   { font-size: .875rem; }
+    .text-lg   { font-size: 1.125rem; }
+    .font-sans    { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .font-mono    { font-family: var(--mono); }
+    .font-semibold { font-weight: 600; }
+    .font-bold    { font-weight: 700; }
+    .tracking-wide   { letter-spacing: .025em; }
+    .tracking-widest { letter-spacing: .1em; }
+    .uppercase { text-transform: uppercase; }
+    .whitespace-pre { white-space: pre; }
+    .whitespace-nowrap { white-space: nowrap; }
+    .text-center { text-align: center; }
+    .select-none { user-select: none; }
+
+    /* ── Colors ─────────────────────────────────────────────────────────── */
+    .text-white   { color: #fff; }
+    .text-gray-200 { color: var(--text); }
+    .text-gray-300 { color: #cbd5e1; }
+    .text-green-400 { color: var(--green); }
+
+    /* ── Header typography ──────────────────────────────────────────────── */
+    header h1 {
+      font-size: 1.125rem;
+      font-weight: 700;
+      letter-spacing: .025em;
+      color: #fff;
+    }
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    header svg { color: var(--accent); }
+
+    /* ── Sections ───────────────────────────────────────────────────────── */
+    main { padding-top: 2rem; padding-bottom: 2rem; }
+    section.callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .5rem;
+      padding: 1.25rem;
+      font-size: .875rem;
+      color: var(--muted);
+    }
+    section.callout p.heading { color: #cbd5e1; font-weight: 600; margin-bottom: .5rem; }
+    section.callout ol { padding-left: 1.25rem; }
+    section.callout li + li { margin-top: .25rem; }
+
+    /* ── Label ──────────────────────────────────────────────────────────── */
+    label.section-label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: .5rem;
+    }
+
+    /* ── Textarea ───────────────────────────────────────────────────────── */
+    textarea#lyricsInput {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .5rem;
+      padding: 1rem;
+      font-size: .875rem;
+      font-family: var(--mono);
+      color: #f1f5f9;
+      resize: vertical;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    textarea#lyricsInput::placeholder { color: var(--muted); }
+    textarea#lyricsInput:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(240,160,0,.3);
+    }
+
+    /* ── Options row ────────────────────────────────────────────────────── */
+    .options-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: .75rem; }
+    .options-row label,
+    .options-row span { font-size: .875rem; color: var(--muted); white-space: nowrap; }
+    input#bindKey {
+      width: 4rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .375rem;
+      padding: .25rem .5rem;
+      text-align: center;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: .875rem;
+      outline: none;
+      text-transform: uppercase;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input#bindKey:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(240,160,0,.3);
+    }
+    input[type="checkbox"] { accent-color: var(--accent); width: 1rem; height: 1rem; cursor: pointer; }
+    .checkbox-label { display: flex; align-items: center; gap: .5rem; cursor: pointer; user-select: none; font-size: .875rem; color: var(--muted); }
+    code.inline { background: var(--bg); padding: .1rem .3rem; border-radius: .25rem; font-size: .75rem; font-family: var(--mono); }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    button {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .875rem;
+      font-weight: 600;
+      border-radius: .5rem;
+      padding: .5rem 1.25rem;
+      border: 1px solid transparent;
+      transition: filter .15s, background .15s;
+      line-height: 1.4;
+    }
+    button:active { filter: brightness(.85); }
+    #generateBtn {
+      background: var(--accent);
+      color: #000;
+      letter-spacing: .025em;
+    }
+    #generateBtn:hover { filter: brightness(1.1); }
+    #copyBtn, #downloadBtn {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    #copyBtn:hover, #downloadBtn:hover { background: var(--border); }
+
+    /* ── Output block ───────────────────────────────────────────────────── */
+    #outputSection .output-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #outputSection .output-header span:first-child {
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    #lineCount { font-size: .75rem; color: var(--muted); }
+    pre#outputBlock {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: .5rem;
+      padding: 1rem;
+      font-size: .75rem;
+      font-family: var(--mono);
+      color: var(--green);
+      overflow-x: auto;
+      white-space: pre;
+      max-height: 24rem;
+      overflow-y: auto;
+      margin-top: .75rem;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: .75rem;
+      color: var(--muted);
+      padding: 1rem;
+      margin-top: 2rem;
+    }
+
+    /* ── SVG icons (inherit colour) ─────────────────────────────────────── */
+    svg { flex-shrink: 0; }
+    header svg { color: var(--accent); }
+    #generateBtn svg, #copyBtn svg, #downloadBtn svg { width: 1rem; height: 1rem; }
+    header svg { width: 1.75rem; height: 1.75rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="max-w-3xl mx-auto px-4 py-5 flex items-center gap-3">
+      <!-- CS2-style crosshair icon -->
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <line x1="12" y1="2"  x2="12" y2="7"/>
+        <line x1="12" y1="17" x2="12" y2="22"/>
+        <line x1="2"  y1="12" x2="7"  y2="12"/>
+        <line x1="17" y1="12" x2="22" y2="12"/>
+      </svg>
+      <div>
+        <h1>CS2 Chat Chainer</h1>
+        <p style="font-size:.75rem;color:var(--muted)">Cyclic alias config generator for CS2 / Source Engine</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 space-y-8">
+
+    <!-- Input section -->
+    <section>
+      <label for="lyricsInput" class="section-label">
+        Input — one command / lyric line per line
+      </label>
+      <textarea
+        id="lyricsInput"
+        rows="12"
+        spellcheck="false"
+        placeholder="Type or paste your lines here…&#10;e.g.&#10;We're no strangers to love&#10;You know the rules and so do I"
+      ></textarea>
+
+      <!-- Options row -->
+      <div class="options-row">
+        <div class="flex items-center gap-2">
+          <label for="bindKey">Bind key:</label>
+          <input id="bindKey" type="text" maxlength="16" value="j" />
+        </div>
+        <label class="checkbox-label" for="sayToggle">
+          <input id="sayToggle" type="checkbox" checked />
+          Prefix lines with <code class="inline">say</code>
+        </label>
+      </div>
+
+      <div style="margin-top:1rem">
+        <button id="generateBtn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Generate Script
+        </button>
+      </div>
+    </section>
+
+    <!-- Output section (hidden until generated) -->
+    <section id="outputSection" class="hidden">
+      <div class="output-header">
+        <span>Output — lyric_script.cfg</span>
+        <span id="lineCount"></span>
+      </div>
+
+      <pre id="outputBlock"></pre>
+
+      <!-- Action buttons -->
+      <div class="flex flex-wrap gap-3" style="margin-top:.75rem">
+        <button id="copyBtn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+          <span id="copyLabel">Copy to Clipboard</span>
+        </button>
+
+        <button id="downloadBtn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download .cfg
+        </button>
+      </div>
+    </section>
+
+    <!-- How-it-works callout -->
+    <section class="callout">
+      <p class="heading">How to use in CS2</p>
+      <ol>
+        <li>Place <code class="inline" style="color:var(--green)">lyric_script.cfg</code> in <code class="inline" style="color:var(--green)">…/game/csgo/cfg/</code></li>
+        <li>Open the CS2 console and run <code class="inline" style="color:var(--green)">exec lyric_script</code></li>
+        <li>Press the configured bind key in-game to advance through each line.</li>
+      </ol>
+    </section>
+
+  </main>
+
+  <footer>
+    CS2 Chat Chainer — static tool, nothing is sent to any server.
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const inputEl      = document.getElementById('lyricsInput');
+      const bindKeyEl    = document.getElementById('bindKey');
+      const sayToggleEl  = document.getElementById('sayToggle');
+      const generateBtn  = document.getElementById('generateBtn');
+      const outputSection = document.getElementById('outputSection');
+      const outputBlock  = document.getElementById('outputBlock');
+      const lineCountEl  = document.getElementById('lineCount');
+      const copyBtn      = document.getElementById('copyBtn');
+      const copyLabel    = document.getElementById('copyLabel');
+      const downloadBtn  = document.getElementById('downloadBtn');
+
+      let currentScript = '';
+
+      // Sanitise a single line: escape double-quotes so they don't break the cfg syntax.
+      function sanitiseLine(raw) {
+        return raw.replace(/"/g, '\\"');
+      }
+
+      // Build alias name for a given 1-based index.
+      function aliasName(i) {
+        return 'line' + i;
+      }
+
+      // Core generator function.
+      function generateScript(lines, bindKey, useSay) {
+        if (lines.length === 0) return '';
+
+        const total = lines.length;
+        const rows = [];
+
+        for (let i = 0; i < total; i++) {
+          const idx       = i + 1;                        // 1-based
+          const nextIdx   = (i + 1) % total + 1;          // wraps: last → 1
+          const name      = aliasName(idx);
+          const nextName  = aliasName(nextIdx);
+          const safe      = sanitiseLine(lines[i]);
+          const command   = useSay ? 'say ' + safe : safe;
+
+          rows.push(`alias "${name}" "${command}; alias loop_cmd ${nextName}"`);
+        }
+
+        rows.push('');
+        rows.push(`alias "loop_cmd" "${aliasName(1)}"`);
+        rows.push(`bind "${bindKey}" "loop_cmd"`);
+
+        return rows.join('\n');
+      }
+
+      generateBtn.addEventListener('click', function () {
+        const rawLines = inputEl.value
+          .split('\n')
+          .map(l => l.trimEnd())   // keep leading spaces (could be intentional), strip trailing
+          .filter(l => l.length > 0);
+
+        if (rawLines.length === 0) {
+          outputSection.classList.add('hidden');
+          outputBlock.textContent = '';
+          currentScript = '';
+          return;
+        }
+
+        const bindKey = bindKeyEl.value.trim() || 'j';
+        const useSay  = sayToggleEl.checked;
+
+        currentScript = generateScript(rawLines, bindKey, useSay);
+
+        outputBlock.textContent = currentScript;
+        lineCountEl.textContent = rawLines.length + ' line' + (rawLines.length !== 1 ? 's' : '');
+        outputSection.classList.remove('hidden');
+        outputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        // Reset copy label in case it was changed
+        copyLabel.textContent = 'Copy to Clipboard';
+      });
+
+      copyBtn.addEventListener('click', function () {
+        if (!currentScript) return;
+
+        navigator.clipboard.writeText(currentScript).then(function () {
+          copyLabel.textContent = 'Copied!';
+          setTimeout(function () {
+            copyLabel.textContent = 'Copy to Clipboard';
+          }, 2000);
+        }).catch(function () {
+          // Legacy fallback for browsers that don't support the Clipboard API (e.g. old Firefox/IE)
+          const ta = document.createElement('textarea');
+          ta.value = currentScript;
+          ta.style.position = 'fixed';
+          ta.style.opacity  = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          copyLabel.textContent = 'Copied!';
+          setTimeout(function () {
+            copyLabel.textContent = 'Copy to Clipboard';
+          }, 2000);
+        });
+      });
+
+      downloadBtn.addEventListener('click', function () {
+        if (!currentScript) return;
+
+        const blob = new Blob([currentScript], { type: 'text/plain' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'lyric_script.cfg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // Auto-uppercase the bind key input as the user types
+      bindKeyEl.addEventListener('input', function () {
+        const pos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(pos, pos);
+      });
+    })();
+  </script>
+
+</body>
+</html>
